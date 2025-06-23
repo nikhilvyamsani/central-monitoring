@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  monitoring:
+    build: .
+    ports:
+      - "8118:8118"  # Exporter
+      - "9090:9090"  # Prometheus
+      - "3000:3000"  # Grafana
+    volumes:
+      - prom_data:/prometheus/data
+      - grafana_data:/grafana/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+
+volumes:
+  prom_data:
+  grafana_data:
