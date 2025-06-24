@@ -1,50 +1,49 @@
-# Multi-architecture base
-FROM --platform=$BUILDPLATFORM python:3.9-slim
+# syntax=docker/dockerfile:1.4
+FROM ubuntu:22.04
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y wget unzip supervisor && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set versions
-ENV PROMETHEUS_VERSION=2.47.0
-ENV GRAFANA_VERSION=10.2.3
-
-# Install Prometheus (auto-detect arch)
 ARG TARGETARCH
-RUN case "${TARGETARCH}" in \
-    "amd64") DL_SUFFIX="linux-amd64" ;; \
-    "arm64") DL_SUFFIX="linux-arm64" ;; \
-    *) echo "Unsupported arch"; exit 1 ;; \
-    esac && \
-    wget -q https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.${DL_SUFFIX}.tar.gz && \
-    tar xfz prometheus-*.tar.gz && \
-    mv prometheus-${PROMETHEUS_VERSION}.${DL_SUFFIX} /prometheus && \
-    rm prometheus-*.tar.gz
+ENV ARCH=${TARGETARCH}
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip wget curl tar supervisor \
+    && apt-get clean
+
+# Create Prometheus user and install Prometheus
+RUN useradd --no-create-home --shell /bin/false prometheus && \
+    mkdir -p /etc/prometheus /prometheus && \
+    cd /tmp && \
+    wget https://github.com/prometheus/prometheus/releases/download/v2.51.0/prometheus-2.51.0.linux-${ARCH}.tar.gz && \
+    tar xvf prometheus-2.51.0.linux-${ARCH}.tar.gz && \
+    mv prometheus-2.51.0.linux-${ARCH}/prometheus /usr/local/bin/ && \
+    mv prometheus-2.51.0.linux-${ARCH}/promtool /usr/local/bin/ && \
+    rm -rf prometheus-2.51.0*
 
 # Install Grafana
-RUN wget -q https://dl.grafana.com/oss/release/grafana-${GRAFANA_VERSION}.linux-${TARGETARCH}.tar.gz && \
-    tar xfz grafana-*.tar.gz && \
-    mv grafana-${GRAFANA_VERSION} /grafana && \
-    rm grafana-*.tar.gz
+RUN wget https://dl.grafana.com/oss/release/grafana_10.4.2_${ARCH}.deb && \
+    apt-get install -y ./grafana_10.4.2_${ARCH}.deb && \
+    rm grafana_10.4.2_${ARCH}.deb
 
-# Install Python requirements
-COPY exporter/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Python requirements
+COPY requirements.txt /app/requirements.txt
+RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
-# Copy configurations
-COPY exporter/exporter.py /app/
-COPY prometheus/prometheus.yml /prometheus/
-COPY grafana/provisioning/ /grafana/conf/provisioning/
+# Grafana & Prometheus configuration
+RUN mkdir -p /etc/grafana/provisioning/datasources \
+    /etc/grafana/provisioning/dashboards \
+    /etc/grafana/dashboards
+
+COPY app.py /app/app.py
+COPY prometheus/prometheus.yml /etc/prometheus/prometheus.yml
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY grafana/dashboards/*.json /etc/grafana/dashboards/
+COPY grafana/provisioning/datasources/ /etc/grafana/provisioning/datasources/
+COPY grafana/provisioning/dashboards/ /etc/grafana/provisioning/dashboards/
+COPY grafana/grafana.ini /etc/grafana/grafana.ini
 
-# Create directories
-RUN mkdir -p /var/log/supervisor && \
-    mkdir -p /prometheus/data && \
-    mkdir -p /grafana/data
+RUN chown -R grafana:grafana /etc/grafana
 
-# Expose ports
+ENV PYTHONUNBUFFERED=1
 EXPOSE 8118 9090 3000
 
-# Start supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/usr/bin/supervisord", "-n"]

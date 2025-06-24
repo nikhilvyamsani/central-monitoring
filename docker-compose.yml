@@ -1,22 +1,22 @@
-version: '3.8'
-
 services:
-  monitoring:
-    build: .
+  my-monitor:
+    image: nikhilvyamsani/my-monitor:latest
+    container_name: my-monitor
     ports:
-      - "8118:8118"  # Exporter
-      - "9090:9090"  # Prometheus
-      - "3000:3000"  # Grafana
+      - "3000:3000"   # Grafana
+      - "9090:9090"   # Prometheus
+      - "8118:8118"   # Custom Python exporter
+    environment:
+      MYSQL_HOST: localhost  
+      MYSQL_USER: root
+      MYSQL_PASSWORD: password
+      MYSQL_DB: take_leap
+      MYSQL_PORT: 3306
+      GF_LOG_LEVEL: debug
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
     volumes:
-      - prom_data:/prometheus/data
-      - grafana_data:/grafana/data
+      - grafana-data:/var/lib/grafana
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 2G
 
 volumes:
-  prom_data:
-  grafana_data:
+  grafana-data:

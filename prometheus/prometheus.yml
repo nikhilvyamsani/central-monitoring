@@ -2,6 +2,6 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: "exporter"
+  - job_name: "my-monitor"
     static_configs:
-      - targets: ["localhost:8118"]
+      - targets: ["my-monitor:8118"]
