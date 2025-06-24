@@ -4,7 +4,7 @@ services:
     container_name: my-monitor
     ports:
       - "3000:3000"   # Grafana
-      - "9090:9090"   # Prometheus
+      - "19090:9090"   # Prometheus
       - "8118:8118"   # Custom Python exporter
     environment:
       MYSQL_HOST: localhost  
