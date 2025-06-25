@@ -1,24 +1,26 @@
+version: "3.8"
+
 services:
   my-monitor:
     image: nikhilvyamsani/my-monitor:latest
     container_name: my-monitor
     network_mode: "host"
-    ports:
-      - "3000:3000"   # Grafana
-      - "19090:9090"   # Prometheus
-      - "8118:8118"   # Custom Python exporter
+    privileged: true
     environment:
-      MYSQL_HOST: localhost  
       MYSQL_USER: root
       MYSQL_PASSWORD: password
       MYSQL_DB: take_leap
       MYSQL_PORT: 3306
-      ROOTFS: /host
+      MYSQL_HOST: localhost
       SITE_NAME: seekright
-      GF_LOG_LEVEL: debug
+      ROOTFS: /host
+      GF_LOG_LEVEL: info
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
-      - /:/host:ro
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
       - grafana-data:/var/lib/grafana
     restart: unless-stopped
 
