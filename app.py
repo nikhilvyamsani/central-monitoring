@@ -16,18 +16,21 @@ DISK_USED = Gauge('host_disk_used', 'Used disk space (bytes)', ['hostname', 'mou
 DISK_FREE = Gauge('host_disk_free', 'Free disk space (bytes)', ['hostname', 'mount'])
 MYSQL_CONNECTIONS = Gauge('host_mysql_connections', 'Active connections', ['hostname'])
 MYSQL_QUERIES = Gauge('host_mysql_queries', 'Queries per second', ['hostname'])
-PROCESSED_VIDEOS = Gauge('processed_videos_count', 'Number of processed videos per site', ['site_id'])
+PROCESSED_VIDEOS = Gauge('processed_videos_count', 'Number of processed videos',['sitename'])
 
 def get_hostname():
     return os.getenv('HOSTNAME', socket.gethostname())
 
 def get_disk_usage():
-    """Cross-platform disk usage collection"""
+    """Get disk usage of host system via mounted rootfs"""
     hostname = get_hostname()
+    rootfs = os.getenv('ROOTFS', '/')
+
     try:
         for partition in psutil.disk_partitions(all=True):
             try:
-                usage = psutil.disk_usage(partition.mountpoint)
+                mount_path = os.path.join(rootfs, partition.mountpoint.lstrip('/'))
+                usage = psutil.disk_usage(mount_path)
                 DISK_TOTAL.labels(hostname, partition.mountpoint).set(usage.total)
                 DISK_USED.labels(hostname, partition.mountpoint).set(usage.used)
                 DISK_FREE.labels(hostname, partition.mountpoint).set(usage.free)
@@ -36,8 +39,10 @@ def get_disk_usage():
     except Exception as e:
         print(f"Disk monitoring error: {str(e)}")
 
+
 def get_processed_videos():
-    """Fetch and expose processed video counts per site"""
+    site_name = os.getenv('SITE_NAME', 'default_site')
+    """Fetch and expose total processed video count"""
     try:
         conn = mysql.connector.connect(
             host=os.getenv('MYSQL_HOST'),
@@ -48,32 +53,27 @@ def get_processed_videos():
             connect_timeout=3
         )
         cursor = conn.cursor(dictionary=True)
-        
-        # Get processed videos count per site
+
         query = """
-        SELECT 
-            site_id, 
-            COUNT(*) as processed_count
+        SELECT COUNT(*) as processed_count
         FROM tbl_videos
         WHERE progress_value = 100 
           AND is_processed = 1
-        GROUP BY site_id
         """
         cursor.execute(query)
-        
-        # Reset all metrics before updating
+        row = cursor.fetchone()
+
+        # Reset and update metric (no need for per-site labels)
         PROCESSED_VIDEOS.clear()
-        
-        # Update metrics for each site
-        for row in cursor:
-            PROCESSED_VIDEOS.labels(site_id=str(row['site_id'])).set(row['processed_count'])
-        
+        PROCESSED_VIDEOS.set(row['processed_count'])
+
         cursor.close()
         conn.close()
     except mysql.connector.Error as e:
         print(f"MySQL connection error: {str(e)}")
     except Exception as e:
         print(f"Processed videos monitoring error: {str(e)}")
+
 
 def get_mysql_metrics():
     hostname = get_hostname()

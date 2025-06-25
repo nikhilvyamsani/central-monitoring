@@ -2,6 +2,7 @@ services:
   my-monitor:
     image: nikhilvyamsani/my-monitor:latest
     container_name: my-monitor
+    network_mode: "host"
     ports:
       - "3000:3000"   # Grafana
       - "19090:9090"   # Prometheus
@@ -12,9 +13,12 @@ services:
       MYSQL_PASSWORD: password
       MYSQL_DB: take_leap
       MYSQL_PORT: 3306
+      ROOTFS: /host
+      SITE_NAME: seekright
       GF_LOG_LEVEL: debug
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
     volumes:
+      - /:/host:ro
       - grafana-data:/var/lib/grafana
     restart: unless-stopped
 

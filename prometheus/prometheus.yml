@@ -4,4 +4,4 @@ global:
 scrape_configs:
   - job_name: "my-monitor"
     static_configs:
-      - targets: ["my-monitor:8118"]
+      - targets: ["localhost:8118"]
